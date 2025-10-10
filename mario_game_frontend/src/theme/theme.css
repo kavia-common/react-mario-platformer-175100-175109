@@ -1,0 +1,194 @@
+:root {
+  --color-primary: #2563EB;
+  --color-secondary: #F59E0B; /* success accent */
+  --color-error: #EF4444;
+  --color-bg: #f9fafb;
+  --color-surface: #ffffff;
+  --color-text: #111827;
+
+  --shadow-sm: 0 1px 2px rgba(17, 24, 39, 0.06);
+  --shadow-md: 0 4px 8px rgba(17, 24, 39, 0.08);
+  --shadow-lg: 0 10px 15px rgba(17, 24, 39, 0.10);
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+
+  --gradient-start: rgba(59,130,246,0.10); /* blue-500/10 */
+  --gradient-end: #f9fafb; /* to gray-50 */
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: linear-gradient(160deg, var(--gradient-start), var(--gradient-end));
+  color: var(--color-text);
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji", "Segoe UI Symbol", sans-serif;
+}
+
+/* Utilities */
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.surface {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.card {
+  background: var(--color-surface);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+}
+
+.button {
+  appearance: none;
+  border: none;
+  outline: none;
+  background: var(--color-primary);
+  color: white;
+  padding: 10px 16px;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  font-weight: 600;
+  transition: transform 120ms ease, box-shadow 120ms ease, background-color 140ms ease;
+}
+.button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.button:active {
+  transform: translateY(0px);
+  box-shadow: var(--shadow-sm);
+}
+
+.button.secondary {
+  background: var(--color-secondary);
+  color: #1f2937;
+}
+
+.button.error {
+  background: var(--color-error);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--color-primary);
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 12px;
+}
+
+/* Game layout helpers */
+.centered-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.game-wrapper {
+  position: relative;
+  width: 100%;
+  display: grid;
+  place-items: center;
+}
+
+.canvas-frame {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(17, 24, 39, 0.06);
+  overflow: hidden;
+}
+
+/* HUD */
+.hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  pointer-events: none;
+}
+.hud .slot {
+  pointer-events: auto; /* allow buttons if any */
+}
+
+.hud .score {
+  background: rgba(255,255,255,0.8);
+  color: #0f172a;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(17,24,39,.06);
+}
+
+.hud .lives {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--color-primary);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid rgba(17,24,39,.06);
+}
+
+/* Overlay */
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  display: grid;
+  place-items: center;
+}
+.overlay-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 20px;
+  text-align: center;
+  min-width: 260px;
+  border: 1px solid rgba(17,24,39,.06);
+}
+
+.canvas-controls {
+  position: absolute;
+  left: 0; right: 0; bottom: 8px;
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  pointer-events: none;
+}
+.canvas-controls .button {
+  pointer-events: auto;
+}
+
+/* Mobile only visibility utility */
+@media (min-width: 769px) {
+  .mobile-only { display: none; }
+}
+@media (max-width: 768px) {
+  .mobile-only { display: block; }
+}
+
+/* Canvas reset */
+canvas {
+  display: block;
+}
