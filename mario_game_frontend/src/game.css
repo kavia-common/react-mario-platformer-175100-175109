@@ -398,6 +398,11 @@
   padding: 18px;
 }
 
+.overlayScrimWaiting {
+  background: rgba(17, 24, 39, 0.34);
+  backdrop-filter: blur(2px);
+}
+
 .overlayCard {
   width: min(460px, 100%);
   background: var(--ocean-surface);
@@ -431,6 +436,12 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.overlayHint {
+  margin: 12px 0 0 0;
+  color: rgba(17, 24, 39, 0.68);
+  font-size: 13px;
 }
 
 .bigBtn {

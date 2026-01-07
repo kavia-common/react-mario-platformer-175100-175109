@@ -31,12 +31,7 @@ function clamp(v, min, max) {
  * @returns {boolean}
  */
 function intersects(a, b) {
-  return (
-    a.x < b.x + b.w &&
-    a.x + a.w > b.x &&
-    a.y < b.y + b.h &&
-    a.y + a.h > b.y
-  );
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 }
 
 /**
@@ -51,9 +46,7 @@ function createLevels() {
       name: "Level 1",
       scrollSpeed: 3.0,
       goalX: 980,
-      enemies: [
-        { id: "e1", x: 640, y: 510, w: 44, h: 34, vx: 1.2, minX: 560, maxX: 760 },
-      ],
+      enemies: [{ id: "e1", x: 640, y: 510, w: 44, h: 34, vx: 1.2, minX: 560, maxX: 760 }],
     },
     {
       id: 2,
@@ -86,7 +79,6 @@ function createLevels() {
  * @returns {Array<{id:string,x:number,y:number,w:number,h:number}>}
  */
 function createPlatforms() {
-  // Note: using some near-screen platforms for interaction + a "floor".
   return [
     { id: "floor", x: -4000, y: 560, w: 12000, h: 120 }, // ground
     { id: "p1", x: 220, y: 470, w: 180, h: 28 },
@@ -116,6 +108,33 @@ const VIEWPORT = { w: 1086, h: 657 };
 const PLAYER = { w: 44, h: 60 };
 
 /**
+ * Core tuning constants to keep game flow consistent.
+ */
+const TUNE = {
+  worldWidth: 9930, // extracted BG width
+  respawn: { x: 120, y: 500 },
+  hitGraceMs: 650, // i-frames after taking damage
+  scoreTickMs: 250,
+};
+
+/**
+ * Computes difficulty scaling for the current level (keeps “feel” but increases challenge).
+ * @param {number} levelIndex
+ * @returns {{moveSpeed:number, gravity:number, jumpVelocity:number, enemySpeedMult:number, scrollAssist:number}}
+ */
+function getDifficulty(levelIndex) {
+  // Keep changes subtle to preserve playability and UI fidelity.
+  const lv = clamp(levelIndex, 0, 10);
+  return {
+    moveSpeed: PHYS.moveSpeed + lv * 0.25,
+    gravity: PHYS.gravity + lv * 0.03,
+    jumpVelocity: PHYS.jumpVelocity - lv * 0.15, // slightly higher jump over time
+    enemySpeedMult: 1 + lv * 0.12,
+    scrollAssist: 1 + lv * 0.05,
+  };
+}
+
+/**
  * PUBLIC_INTERFACE
  * Main React App: renders the "Play here" styled game and level/game-state system.
  */
@@ -133,8 +152,8 @@ function App() {
 
   // Player state
   const [player, setPlayer] = useState(() => ({
-    x: 120,
-    y: 500,
+    x: TUNE.respawn.x,
+    y: TUNE.respawn.y,
     vx: 0,
     vy: 0,
     onGround: false,
@@ -148,77 +167,155 @@ function App() {
   const rafRef = useRef(null);
   const lastTimeRef = useRef(null);
 
+  // Keep “latest state” refs for checks inside RAF without depending on React update timing.
+  const playerRef = useRef(player);
+  const enemiesRef = useRef(enemies);
+  const scrollXRef = useRef(scrollX);
+  const levelIndexRef = useRef(levelIndex);
+  const gameStateRef = useRef(gameState);
+  const livesRef = useRef(lives);
+
+  // Anti-double-trigger guards (win/fall/damage)
+  const resolvingRef = useRef(false);
+  const lastHitAtRef = useRef(0);
+
   const currentLevel = levels[levelIndex];
   const isLastLevel = levelIndex === levels.length - 1;
+  const difficulty = useMemo(() => getDifficulty(levelIndex), [levelIndex]);
+
+  // Sync refs whenever state changes
+  useEffect(() => {
+    playerRef.current = player;
+  }, [player]);
+  useEffect(() => {
+    enemiesRef.current = enemies;
+  }, [enemies]);
+  useEffect(() => {
+    scrollXRef.current = scrollX;
+  }, [scrollX]);
+  useEffect(() => {
+    levelIndexRef.current = levelIndex;
+  }, [levelIndex]);
+  useEffect(() => {
+    gameStateRef.current = gameState;
+  }, [gameState]);
+  useEffect(() => {
+    livesRef.current = lives;
+  }, [lives]);
 
   /**
-   * Reset the current level to a clean state (keep lives/score optionally).
-   * @param {{keepScore?:boolean, keepLives?:boolean}} opts
+   * Reset a specific level index (defaults to current).
+   * Keeps score/lives depending on opts.
+   * @param {number} idx
+   * @param {{keepScore?:boolean, keepLives?:boolean, nextState?:string}} opts
    */
-  function resetLevel(opts = {}) {
+  function resetLevelIndex(idx, opts = {}) {
     const keepScore = Boolean(opts.keepScore);
     const keepLives = Boolean(opts.keepLives);
+    const nextState = opts.nextState || GAME_STATE.WAITING;
+
+    resolvingRef.current = false;
+    lastHitAtRef.current = 0;
 
     setScrollX(0);
-    setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
-    setEnemies(levels[levelIndex].enemies.map((e) => ({ ...e })));
-    setGameState(GAME_STATE.WAITING);
+    setPlayer({ x: TUNE.respawn.x, y: TUNE.respawn.y, vx: 0, vy: 0, onGround: false });
+    setEnemies(levels[idx].enemies.map((e) => ({ ...e })));
+    setGameState(nextState);
 
     if (!keepScore) setScore(0);
     if (!keepLives) setLives(3);
   }
 
   /**
+   * PUBLIC_INTERFACE
+   * Reset the current level to a clean state (keep lives/score optionally).
+   * @param {{keepScore?:boolean, keepLives?:boolean}} opts
+   */
+  function resetLevel(opts = {}) {
+    resetLevelIndex(levelIndexRef.current, opts);
+  }
+
+  /**
+   * PUBLIC_INTERFACE
    * Start gameplay for the current level (S key or Start button).
    */
   function startGame() {
-    if (gameState === GAME_STATE.GAME_OVER || gameState === GAME_STATE.GAME_FINISHED) return;
+    const st = gameStateRef.current;
+    if (st === GAME_STATE.GAME_OVER || st === GAME_STATE.GAME_FINISHED) return;
     setGameState(GAME_STATE.PLAYING);
   }
 
   /**
+   * PUBLIC_INTERFACE
    * Proceed to next level or finish the game.
+   * Ensures level transition resets level-specific entities reliably.
    */
   function completeLevel() {
+    if (resolvingRef.current) return;
+    resolvingRef.current = true;
+
     if (isLastLevel) {
       setGameState(GAME_STATE.GAME_FINISHED);
       return;
     }
+
+    // Move to next level and reset level-specific state (keeping score/lives).
     setLevelIndex((idx) => idx + 1);
-    // score carries across levels; lives carry across
     setGameState(GAME_STATE.WAITING);
   }
 
   /**
+   * PUBLIC_INTERFACE
    * Full restart from Level 1.
    */
   function restartFromBeginning() {
+    resolvingRef.current = false;
+    lastHitAtRef.current = 0;
+
     setLevelIndex(0);
     setScore(0);
     setLives(3);
     setScrollX(0);
-    setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
+    setPlayer({ x: TUNE.respawn.x, y: TUNE.respawn.y, vx: 0, vy: 0, onGround: false });
     setEnemies(levels[0].enemies.map((e) => ({ ...e })));
     setGameState(GAME_STATE.WAITING);
   }
 
-  // When level changes, reset level-specific state
+  /**
+   * PUBLIC_INTERFACE
+   * Continue to next level from WAITING.
+   * (Used by overlay when a level completes and we are waiting to start.)
+   */
+  function startNextLevel() {
+    if (gameStateRef.current !== GAME_STATE.WAITING) return;
+    startGame();
+  }
+
+  // When level changes, reset level-specific state reliably and clear guard.
   useEffect(() => {
+    resolvingRef.current = false;
+    lastHitAtRef.current = 0;
     setScrollX(0);
-    setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
+    setPlayer({ x: TUNE.respawn.x, y: TUNE.respawn.y, vx: 0, vy: 0, onGround: false });
     setEnemies(levels[levelIndex].enemies.map((e) => ({ ...e })));
   }, [levelIndex, levels]);
 
   // Keyboard listeners
   useEffect(() => {
     function onKeyDown(e) {
+      // If an overlay is up, allow quick restart via R.
+      if (e.code === "KeyR") {
+        restartFromBeginning();
+        return;
+      }
+
       if (e.code === "ArrowLeft" || e.code === "KeyA") inputRef.current.left = true;
       if (e.code === "ArrowRight" || e.code === "KeyD") inputRef.current.right = true;
       if (e.code === "Space") inputRef.current.jump = true;
 
       if (e.code === "KeyS") {
         // In extracted design: "Press s to start the game"
-        if (gameState === GAME_STATE.WAITING) startGame();
+        if (gameStateRef.current === GAME_STATE.WAITING) startGame();
       }
 
       // Prevent page scroll on space
@@ -237,7 +334,31 @@ function App() {
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [gameState]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Resolve taking damage: decrement life, possibly GAME_OVER, otherwise respawn and continue.
+   * Uses i-frames to avoid repeated collision-trigger while overlapping.
+   */
+  function applyDamage() {
+    const now = performance.now();
+    if (now - lastHitAtRef.current < TUNE.hitGraceMs) return;
+    lastHitAtRef.current = now;
+
+    setLives((l) => {
+      const next = l - 1;
+      if (next <= 0) {
+        setGameState(GAME_STATE.GAME_OVER);
+        return 0;
+      }
+      // penalty + respawn, keep playing
+      setScore((s) => Math.max(0, s - 50));
+      setScrollX(0);
+      setPlayer({ x: TUNE.respawn.x, y: TUNE.respawn.y, vx: 0, vy: 0, onGround: false });
+      return next;
+    });
+  }
 
   // Core game loop (RAF)
   useEffect(() => {
@@ -249,15 +370,21 @@ function App() {
     }
 
     function step(t) {
+      if (gameStateRef.current !== GAME_STATE.PLAYING) return;
+
       if (lastTimeRef.current == null) lastTimeRef.current = t;
       // normalize dt to ~60fps steps
       const dt = clamp((t - lastTimeRef.current) / 16.6667, 0.5, 2.0);
       lastTimeRef.current = t;
 
-      // Update enemies (patrol)
+      const worldMaxScroll = clamp(TUNE.worldWidth - VIEWPORT.w, 0, TUNE.worldWidth);
+
+      // Update enemies (patrol) + scaling
       setEnemies((prev) =>
         prev.map((en) => {
-          let nx = en.x + en.vx * dt;
+          const speed = en.vx * difficulty.enemySpeedMult;
+          let nx = en.x + speed * dt;
+
           if (nx < en.minX) {
             nx = en.minX;
             return { ...en, x: nx, vx: Math.abs(en.vx) };
@@ -275,63 +402,83 @@ function App() {
         const input = inputRef.current;
 
         let vx = 0;
-        if (input.left) vx -= PHYS.moveSpeed;
-        if (input.right) vx += PHYS.moveSpeed;
+        if (input.left) vx -= difficulty.moveSpeed;
+        if (input.right) vx += difficulty.moveSpeed;
 
         // Jump (only when grounded)
         let vy = p.vy;
         let onGround = p.onGround;
 
         if (input.jump && onGround) {
-          vy = PHYS.jumpVelocity;
+          vy = difficulty.jumpVelocity;
           onGround = false;
         }
 
         // Gravity
-        vy = clamp(vy + PHYS.gravity * dt, -100, PHYS.terminalVelocity);
+        vy = clamp(vy + difficulty.gravity * dt, -100, PHYS.terminalVelocity);
 
         let nx = p.x + vx * dt;
         let ny = p.y + vy * dt;
 
-        // Resolve collisions with platforms (simple: vertical only + clamp within world)
+        // Resolve collisions with platforms (simple: vertical only)
         let landed = false;
         const hitbox = { x: nx, y: ny, w: PLAYER.w, h: PLAYER.h };
         for (const plat of platforms) {
           const platBox = { x: plat.x, y: plat.y, w: plat.w, h: plat.h };
-          // Only treat as ground if falling and would intersect
           if (vy >= 0 && intersects(hitbox, platBox)) {
-            // Snap to top of platform
             ny = plat.y - PLAYER.h;
             vy = 0;
             landed = true;
           }
         }
 
-        // Keep within viewport Y bounds
-        if (ny > VIEWPORT.h + 100) {
-          // fell off
-          landed = false;
-        }
+        // Keep within viewport X bounds (screen space)
+        nx = clamp(nx, 0, VIEWPORT.w - PLAYER.w);
 
         // Auto-scroll: keep player around center by shifting scrollX
-        // Convert player screen x to "world x" by adding scrollX.
-        const worldX = nx + scrollX;
-        const desiredScroll = clamp(worldX - VIEWPORT.w * 0.45, 0, 9930 - VIEWPORT.w);
-        // Smoothly approach desired scroll
+        const worldX = nx + scrollXRef.current;
+        const desiredScroll = clamp(worldX - VIEWPORT.w * 0.45, 0, worldMaxScroll);
+
         setScrollX((sx) => {
           const target = desiredScroll;
-          const lerp = 0.18 * dt;
+          const lerp = 0.18 * dt * difficulty.scrollAssist;
           return sx + (target - sx) * lerp;
         });
 
-        // If player goes too far left, clamp to 0 screen coordinate
-        nx = clamp(nx, 0, VIEWPORT.w - PLAYER.w);
+        // Win/lose checks from latest predicted values:
+        // - falling beyond screen triggers damage (handled here to avoid missing frames)
+        if (ny > VIEWPORT.h + 40) {
+          // Do not also move player on the same frame; damage handler respawns.
+          // We keep ny, but state update will happen after setPlayer resolves.
+          applyDamage();
+        }
+
+        // Enemy collision check using *predicted* player position + latest enemies
+        // (note: enemies are in screen-space relative to BG; collision should be in world-space)
+        const sx = scrollXRef.current;
+        const playerWorld = { x: nx + sx, y: ny, w: PLAYER.w, h: PLAYER.h };
+        const ens = enemiesRef.current;
+        const inIFrames = performance.now() - lastHitAtRef.current < TUNE.hitGraceMs;
+
+        if (!inIFrames) {
+          for (const en of ens) {
+            const enemyWorld = { x: en.x + sx, y: en.y, w: en.w, h: en.h };
+            if (intersects(playerWorld, enemyWorld)) {
+              applyDamage();
+              break;
+            }
+          }
+        }
+
+        // Win condition: reach goal X in world coords
+        if (!resolvingRef.current && playerWorld.x >= currentLevel.goalX) {
+          setScore((s) => s + 300 + levelIndexRef.current * 150);
+          completeLevel();
+        }
 
         return { x: nx, y: ny, vx, vy, onGround: landed };
       });
 
-      // Collisions and win/lose checks must use latest values, so we compute with refs via functional updates:
-      // We'll do the checks using current state values by scheduling another frame and using closures over latest state
       rafRef.current = requestAnimationFrame(step);
     }
 
@@ -340,65 +487,16 @@ function App() {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, [gameState, platforms, scrollX]);
-
-  // Post-step checks for collisions/win/lose (triggered on state changes)
-  useEffect(() => {
-    if (gameState !== GAME_STATE.PLAYING) return;
-
-    // Compute world-space hitboxes (screen pos + scrollX)
-    const playerWorld = { x: player.x + scrollX, y: player.y, w: PLAYER.w, h: PLAYER.h };
-
-    // Enemy collision
-    for (const en of enemies) {
-      const enemyWorld = { x: en.x + scrollX, y: en.y, w: en.w, h: en.h };
-      if (intersects(playerWorld, enemyWorld)) {
-        // Take a life and reset player position. If no lives -> GAME_OVER.
-        setLives((l) => {
-          const next = l - 1;
-          if (next <= 0) {
-            setGameState(GAME_STATE.GAME_OVER);
-            return 0;
-          }
-          // small penalty, keep playing after reposition
-          setScore((s) => Math.max(0, s - 50));
-          setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
-          setScrollX(0);
-          return next;
-        });
-        break;
-      }
-    }
-
-    // Fell off world
-    if (player.y > VIEWPORT.h + 40) {
-      setLives((l) => {
-        const next = l - 1;
-        if (next <= 0) {
-          setGameState(GAME_STATE.GAME_OVER);
-          return 0;
-        }
-        setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
-        setScrollX(0);
-        return next;
-      });
-    }
-
-    // Win condition: reach goal X in world coords
-    const goalX = currentLevel.goalX;
-    if (playerWorld.x >= goalX) {
-      // Award points by level and complete
-      setScore((s) => s + 300 + levelIndex * 150);
-      completeLevel();
-    }
-  }, [currentLevel.goalX, enemies, gameState, levelIndex, player.x, player.y, scrollX]);
+  }, [currentLevel.goalX, difficulty, gameState, platforms]);
 
   // Score tick while playing (small)
   useEffect(() => {
     if (gameState !== GAME_STATE.PLAYING) return;
     const id = window.setInterval(() => {
+      // Prevent tick after end-state.
+      if (gameStateRef.current !== GAME_STATE.PLAYING) return;
       setScore((s) => s + 1);
-    }, 250);
+    }, TUNE.scoreTickMs);
     return () => window.clearInterval(id);
   }, [gameState]);
 
@@ -408,12 +506,21 @@ function App() {
   const marioStyle = {
     left: `${player.x}px`,
     top: `${player.y}px`,
+    filter:
+      performance.now() - lastHitAtRef.current < TUNE.hitGraceMs
+        ? "drop-shadow(0 0 10px rgba(239,68,68,0.45))"
+        : "none",
+    opacity: performance.now() - lastHitAtRef.current < TUNE.hitGraceMs ? 0.92 : 1,
   };
 
   const enemyStyles = enemies.map((en) => ({
     id: en.id,
-    style: { left: `${en.x}px`, top: `${en.y}px` }, // this is in screen space (we apply scroll on BG container)
+    style: { left: `${en.x}px`, top: `${en.y}px` },
   }));
+
+  const showWaitingOverlay = gameState === GAME_STATE.WAITING;
+  const showGameOverOverlay = gameState === GAME_STATE.GAME_OVER;
+  const showFinishedOverlay = gameState === GAME_STATE.GAME_FINISHED;
 
   return (
     <div className="gameApp">
@@ -441,23 +548,24 @@ function App() {
               className="smallBtn"
               onClick={() => resetLevel({ keepScore: true, keepLives: true })}
               type="button"
+              disabled={showGameOverOverlay || showFinishedOverlay}
+              aria-disabled={showGameOverOverlay || showFinishedOverlay}
+              title={showGameOverOverlay || showFinishedOverlay ? "Restart to play again" : "Reset current level"}
             >
               Reset Level
             </button>
             <button className="smallBtn" onClick={restartFromBeginning} type="button">
-              Restart Game
+              Restart Game (R)
             </button>
           </div>
         </div>
 
         <div className="hintRow" aria-label="Controls help">
           <div>
-            Controls: <strong>A/D</strong> or <strong>←/→</strong> to move, <strong>Space</strong> to
-            jump, <strong>S</strong> to start.
+            Controls: <strong>A/D</strong> or <strong>←/→</strong> to move, <strong>Space</strong> to jump,{" "}
+            <strong>S</strong> to start. <strong>R</strong> restarts.
           </div>
-          <div>
-            Objective: reach the goal (right side). Avoid enemies or you lose lives.
-          </div>
+          <div>Objective: reach the goal (right side). Avoid enemies or you lose lives.</div>
         </div>
 
         <div className="playHereStageWrap">
@@ -470,14 +578,35 @@ function App() {
                   <div className="ph-bg-base" aria-label="background base" />
 
                   {/* Extracted platform blocks (off-screen in original, but kept for fidelity) */}
-                  <div className="ph-rect8" style={{ left: 9268.3057, top: 63.0332, width: 240.0110, height: 523.6605 }} />
-                  <div className="ph-rect6" style={{ left: 7614.8960, top: 424.2617, width: 121.2177, height: 60.6089 }} />
-                  <div className="ph-rect3" style={{ left: 6211.1953, top: 368.5020, width: 528.5092, height: 218.1919 }} />
-                  <div className="ph-rect4" style={{ left: 6720.3096, top: 336.9854, width: 627.9077, height: 249.7085 }} />
-                  <div className="ph-rect5" style={{ left: 8475.5420, top: 189.0996, width: 463.0516, height: 397.5941 }} />
-                  <div className="ph-rect7" style={{ left: 2630.4241, top: 324.8633, width: 157.5830, height: 65.4576 }} />
+                  <div
+                    className="ph-rect8"
+                    style={{ left: 9268.3057, top: 63.0332, width: 240.011, height: 523.6605 }}
+                  />
+                  <div
+                    className="ph-rect6"
+                    style={{ left: 7614.896, top: 424.2617, width: 121.2177, height: 60.6089 }}
+                  />
+                  <div
+                    className="ph-rect3"
+                    style={{ left: 6211.1953, top: 368.502, width: 528.5092, height: 218.1919 }}
+                  />
+                  <div
+                    className="ph-rect4"
+                    style={{ left: 6720.3096, top: 336.9854, width: 627.9077, height: 249.7085 }}
+                  />
+                  <div
+                    className="ph-rect5"
+                    style={{ left: 8475.542, top: 189.0996, width: 463.0516, height: 397.5941 }}
+                  />
+                  <div
+                    className="ph-rect7"
+                    style={{ left: 2630.4241, top: 324.8633, width: 157.583, height: 65.4576 }}
+                  />
                   <div className="ph-reggr" style={{ left: 984.2878, top: 397.5938, width: 46.0627, height: 48.4871 }} />
-                  <div className="ph-535greg" style={{ left: 1078.8375, top: 397.5938, width: 46.0627, height: 48.4871 }} />
+                  <div
+                    className="ph-535greg"
+                    style={{ left: 1078.8375, top: 397.5938, width: 46.0627, height: 48.4871 }}
+                  />
 
                   {/* Our gameplay platforms (visible and near-screen) */}
                   {platforms
@@ -497,7 +626,7 @@ function App() {
                       />
                     ))}
 
-                  {/* Enemy visuals: use the extracted enemy component style (simple) */}
+                  {/* Enemy visuals */}
                   {enemyStyles.map((en) => (
                     <div key={en.id} className="ph-enemy" style={en.style} aria-label="Enemy">
                       <div className="ph-enemy-body" aria-hidden="true">
@@ -512,31 +641,19 @@ function App() {
                     </div>
                   ))}
 
-                  {/* Goal marker: princess-inspired marker near the end (screen space => place at goalX) */}
-                  <div
-                    className="ph-princess"
-                    style={{ left: currentLevel.goalX, top: 450 }}
-                    aria-label="Goal"
-                  >
+                  {/* Goal marker */}
+                  <div className="ph-princess" style={{ left: currentLevel.goalX, top: 450 }} aria-label="Goal">
                     <div className="ph-princess-base" aria-hidden="true" />
-                    <img
-                      className="ph-princess-rect1"
-                      src="/assets/figma_image_34_361_30_176_22_234.svg"
-                      alt=""
-                    />
+                    <img className="ph-princess-rect1" src="/assets/figma_image_34_361_30_176_22_234.svg" alt="" />
                     <div className="ph-princess-dot" aria-hidden="true">
                       .
                     </div>
                   </div>
                 </div>
 
-                {/* Instructions overlay (as per extracted) */}
+                {/* Instructions overlay */}
                 <div className="ph-inst" aria-label="Instructions">
-                  <img
-                    className="ph-inst-icon"
-                    src="/assets/figma_image_34_361_29_269.svg"
-                    alt="icon"
-                  />
+                  <img className="ph-inst-icon" src="/assets/figma_image_34_361_29_269.svg" alt="icon" />
                   <div className="ph-inst-bar" aria-hidden="true" />
                   <div className="ph-inst-text">
                     Press   s   to  start  the   game.{"\n"}
@@ -556,7 +673,7 @@ function App() {
               </div>
 
               {/* Overlays */}
-              {gameState === GAME_STATE.GAME_OVER && (
+              {showGameOverOverlay && (
                 <div className="overlayScrim" role="dialog" aria-modal="true" aria-label="Game Over">
                   <div className="overlayCard">
                     <h2 className="overlayTitle overlayTitleGameOver">Game Over</h2>
@@ -569,25 +686,18 @@ function App() {
                       </button>
                       <button
                         className="bigBtn"
-                        onClick={() => {
-                          setLives(3);
-                          setScore(0);
-                          setScrollX(0);
-                          setPlayer({ x: 120, y: 500, vx: 0, vy: 0, onGround: false });
-                          setEnemies(levels[0].enemies.map((e) => ({ ...e })));
-                          setLevelIndex(0);
-                          setGameState(GAME_STATE.WAITING);
-                        }}
+                        onClick={() => resetLevelIndex(0, { keepLives: false, keepScore: false, nextState: GAME_STATE.WAITING })}
                         type="button"
                       >
                         Back to Start
                       </button>
                     </div>
+                    <p className="overlayHint">Tip: Press <strong>R</strong> to restart instantly.</p>
                   </div>
                 </div>
               )}
 
-              {gameState === GAME_STATE.GAME_FINISHED && (
+              {showFinishedOverlay && (
                 <div className="overlayScrim" role="dialog" aria-modal="true" aria-label="Game Finished">
                   <div className="overlayCard">
                     <h2 className="overlayTitle overlayTitleFinished">You finished!</h2>
@@ -603,12 +713,25 @@ function App() {
                 </div>
               )}
 
-              {gameState === GAME_STATE.WAITING && (
-                <div
-                  className="overlayScrim"
-                  style={{ background: "rgba(17,24,39,0.28)", pointerEvents: "none" }}
-                  aria-hidden="true"
-                />
+              {showWaitingOverlay && (
+                <div className="overlayScrim overlayScrimWaiting" role="dialog" aria-modal="true" aria-label="Ready">
+                  <div className="overlayCard">
+                    <h2 className="overlayTitle">Ready: {currentLevel.name}</h2>
+                    <p className="overlayText">
+                      Reach the goal and avoid enemies. Difficulty scales each level.
+                      <br />
+                      Press <strong>S</strong> or click Start.
+                    </p>
+                    <div className="overlayActions">
+                      <button className="bigBtn bigBtnPrimary" onClick={startNextLevel} type="button">
+                        Start Level
+                      </button>
+                      <button className="bigBtn" onClick={restartFromBeginning} type="button">
+                        Restart Game
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           </div>
