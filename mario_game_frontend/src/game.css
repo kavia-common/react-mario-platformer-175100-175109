@@ -1,0 +1,476 @@
+:root {
+  /* Ocean Professional theme */
+  --ocean-primary: #2563eb;
+  --ocean-accent: #f59e0b;
+  --ocean-error: #ef4444;
+  --ocean-bg: #f9fafb;
+  --ocean-surface: #ffffff;
+  --ocean-text: #111827;
+
+  --shadow-soft: 0 14px 30px rgba(17, 24, 39, 0.08);
+  --shadow-hard: 4.848708152770996px 4.848708152770996px 0px 0px #000000; /* from extracted */
+}
+
+/* App layout */
+.gameApp {
+  min-height: 100vh;
+  background: radial-gradient(1200px 700px at 20% 0%, rgba(37, 99, 235, 0.10), transparent 60%),
+    radial-gradient(900px 500px at 80% 10%, rgba(245, 158, 11, 0.10), transparent 55%),
+    var(--ocean-bg);
+  color: var(--ocean-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.gameShell {
+  width: min(1120px, 100%);
+  display: grid;
+  gap: 16px;
+}
+
+.topBar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--ocean-surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  padding: 12px 16px;
+}
+
+.topBarLeft,
+.topBarRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.08);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.pillAccent {
+  background: rgba(245, 158, 11, 0.10);
+  border: 1px solid rgba(245, 158, 11, 0.20);
+}
+
+.pillError {
+  background: rgba(239, 68, 68, 0.10);
+  border: 1px solid rgba(239, 68, 68, 0.20);
+}
+
+.smallBtn {
+  appearance: none;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: var(--ocean-surface);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+}
+
+.smallBtnPrimary {
+  border-color: rgba(37, 99, 235, 0.35);
+  background: rgba(37, 99, 235, 0.10);
+}
+
+.smallBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 20px rgba(17, 24, 39, 0.10);
+  border-color: rgba(17, 24, 39, 0.18);
+}
+
+.smallBtn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+.hintRow {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(17, 24, 39, 0.75);
+  font-size: 13px;
+  padding: 0 4px;
+}
+
+/* =========================
+   "Play here" screen wrapper
+   ========================= */
+.playHereStageWrap {
+  display: flex;
+  justify-content: center;
+}
+
+.play-here-viewport {
+  width: min(1086px, 100%);
+  aspect-ratio: 1086 / 657;
+  background: var(--ocean-surface);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(17, 24, 39, 0.08);
+}
+
+/* Inner fixed canvas uses absolute positioning like the extracted HTML */
+.play-here-canvas {
+  width: 1086px;
+  height: 657px;
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  overflow: hidden;
+  background: #ffffff;
+}
+
+/* ===== Extracted styles adapted (subset) ===== */
+.ph-component-3 {
+  left: 0px;
+  top: 0px;
+  width: 1086.1106px;
+  height: 657px;
+  position: absolute;
+  background: #ffffff;
+}
+
+.ph-bg {
+  left: 0px;
+  top: 0px;
+  width: 9930.1543px;
+  height: 657px;
+  position: absolute;
+  overflow: hidden;
+}
+
+.ph-bg-base {
+  left: 0px;
+  top: 0px;
+  width: 9930.1543px;
+  height: 657px;
+  position: absolute;
+  background: linear-gradient(180deg, #8fd3ff 0%, #ccecff 60%, #d7f6ff 100%);
+}
+
+/* Platforms */
+.ph-rect8,
+.ph-rect6,
+.ph-rect3,
+.ph-rect4,
+.ph-rect5,
+.ph-rect7 {
+  position: absolute;
+  background: #6b8cff;
+}
+
+/* Unstyled rect placeholders */
+.ph-reggr,
+.ph-535greg {
+  position: absolute;
+  background: transparent;
+}
+
+.ph-enemy {
+  position: absolute;
+  width: 252.1328px;
+  height: 101.8229px;
+}
+
+.ph-enemy-body {
+  position: absolute;
+  left: 169.7051px;
+  top: 0px;
+  width: 82.4280px;
+  height: 101.8229px;
+}
+
+.ph-enemy-black,
+.ph-enemy-white,
+.ph-enemy-green,
+.ph-enemy-orange {
+  position: absolute;
+}
+
+.ph-enemy-black {
+  left: 0;
+  top: 0;
+  width: 82.4280px;
+  height: 101.8229px;
+  background: #000;
+}
+.ph-enemy-white {
+  left: 2.4243px;
+  top: 2.4238px;
+  width: 75.1550px;
+  height: 96.9742px;
+  background: #fff;
+}
+.ph-enemy-green {
+  left: 12.1216px;
+  top: 9.6973px;
+  width: 65.4576px;
+  height: 72.7306px;
+  background: #008200;
+}
+.ph-enemy-orange {
+  left: 4.8486px;
+  top: 2.4238px;
+  width: 75.1550px;
+  height: 96.9742px;
+  background: #d8982c;
+}
+
+.ph-enemy-red,
+.ph-enemy-white2,
+.ph-enemy-black2 {
+  position: absolute;
+}
+.ph-enemy-red {
+  left: 67.8823px;
+  top: 18.0214px;
+  width: 116.4550px;
+  height: 43.6772px;
+  background: #e64434;
+}
+.ph-enemy-white2 {
+  left: 85.2085px;
+  top: 26.7354px;
+  width: 93.6684px;
+  height: 29.7121px;
+  background: #fff;
+}
+.ph-enemy-black2 {
+  left: 107.1553px;
+  top: 31.0405px;
+  width: 66.6809px;
+  height: 22.5731px;
+  background: #000;
+}
+
+.ph-princess {
+  position: absolute;
+  width: 110.7728px;
+  height: 131.1269px;
+}
+
+.ph-princess-base {
+  position: absolute;
+  left: 0.0798px;
+  top: 1.6055px;
+  width: 110.6530px;
+  height: 126.31px;
+  background: transparent;
+}
+
+.ph-princess-rect1 {
+  position: absolute;
+  left: 7.2724px;
+  top: 7.2735px;
+  width: 51.6174px;
+  height: 16.3003px;
+  border-radius: 7.2731px;
+  background: #fff;
+  object-fit: contain;
+}
+
+.ph-princess-dot {
+  position: absolute;
+  left: 14.5460px;
+  top: 4.8487px;
+  width: 41.8126px;
+  height: 20.0581px;
+  font-family: "ArcadeClassic", monospace;
+  font-size: 18.615px;
+  line-height: 18.838px;
+  color: #000;
+  white-space: pre;
+}
+
+/* Instructions overlay */
+.ph-inst {
+  position: absolute;
+  left: 38.7897px;
+  top: 33.9414px;
+  width: 625.4833px;
+  height: 97.0817px;
+  overflow: visible;
+}
+
+.ph-inst-icon {
+  position: absolute;
+  left: 142.8486px;
+  top: 4.1592px;
+  width: 42.9933px;
+  height: 42.9933px;
+  object-fit: contain;
+}
+
+.ph-inst-bar {
+  position: absolute;
+  left: 140.0751px;
+  top: 52.7012px;
+  width: 249.7085px;
+  height: 44.3802px;
+  background: #2f4fbf;
+}
+
+.ph-inst-text {
+  position: absolute;
+  left: 0px;
+  top: 2.4238px;
+  width: 802.8367px;
+  height: 235.7698px;
+  font-family: "ArcadeClassic", monospace;
+  font-size: 48.78px;
+  line-height: 49.365px;
+  color: #ffffff;
+  white-space: pre;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.25);
+}
+
+/* Mario */
+.ph-mario {
+  position: absolute;
+  width: 112px;
+  height: 180px;
+  overflow: visible;
+}
+
+.ph-mario-group {
+  position: absolute;
+  left: 0px;
+  top: 103.7803px;
+  width: 62.0843px;
+  height: 77.5862px;
+}
+
+.ph-mario-vector3 {
+  position: absolute;
+  left: 0px;
+  top: 0px;
+  width: 62.0843px;
+  height: 77.5862px;
+  background: #000;
+}
+
+.ph-mario-vector2 {
+  position: absolute;
+  left: 5.1738px;
+  top: 5.1719px;
+  width: 51.7369px;
+  height: 67.2414px;
+  background: #f83800;
+}
+
+.ph-mario-vector1 {
+  position: absolute;
+  left: 5.1738px;
+  top: 15.5176px;
+  width: 51.7369px;
+  height: 51.7241px;
+  object-fit: contain;
+}
+
+/* UI overlays */
+.overlayScrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.52);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 18px;
+}
+
+.overlayCard {
+  width: min(460px, 100%);
+  background: var(--ocean-surface);
+  border-radius: 18px;
+  box-shadow: var(--shadow-soft);
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  padding: 18px;
+}
+
+.overlayTitle {
+  margin: 0 0 8px 0;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  font-size: 28px;
+}
+
+.overlayTitleGameOver {
+  color: var(--ocean-error);
+}
+.overlayTitleFinished {
+  color: var(--ocean-primary);
+}
+
+.overlayText {
+  margin: 0 0 14px 0;
+  color: rgba(17, 24, 39, 0.78);
+  line-height: 1.35;
+}
+
+.overlayActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.bigBtn {
+  appearance: none;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-weight: 800;
+  cursor: pointer;
+  background: rgba(17, 24, 39, 0.06);
+  transition: transform 120ms ease, box-shadow 120ms ease, background 120ms ease;
+}
+
+.bigBtnPrimary {
+  background: var(--ocean-primary);
+  color: #fff;
+}
+
+.bigBtnAccent {
+  background: var(--ocean-accent);
+  color: #111827;
+}
+
+.bigBtn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 18px rgba(17, 24, 39, 0.16);
+}
+
+.bigBtn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
+/* Smaller screens: tighten */
+@media (max-width: 720px) {
+  .topBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .hintRow {
+    flex-direction: column;
+  }
+}
